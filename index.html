@@ -172,13 +172,18 @@
             document.getElementById('verifyResult').classList.add('hidden');
         }
 
-        // Embed Data
+        // Embed Data (UPDATED WITH FIXES)
         document.getElementById('embedBtn').onclick = function() {
             const file = document.getElementById('uploadImg').files[0];
             const name = document.getElementById('name').value.trim();
             const mobile = document.getElementById('mobile').value.trim();
             const idnum = document.getElementById('idnum').value.trim();
             
+            // Button loading state
+            const btn = document.getElementById('embedBtn');
+            btn.innerText = "⏳ Processing... Please wait";
+            btn.disabled = true;
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
@@ -187,39 +192,75 @@
             const binData = strToBin(data);
             
             img.onload = () => {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const pixels = imageData.data;
-                
-                for (let i = 0; i < binData.length; i++) {
-                    const byteIndex = i % 3;
-                    const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
-                    if (pixelIndex < pixels.length) {
-                        pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | parseInt(binData[i]);
+                try {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const pixels = imageData.data;
+                    
+                    for (let i = 0; i < binData.length; i++) {
+                        const byteIndex = i % 3;
+                        const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
+                        if (pixelIndex < pixels.length) {
+                            pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | parseInt(binData[i]);
+                        }
                     }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    // Final image data url for screen display
+                    const finalDataUrl = canvas.toDataURL('image/png');
+                    
+                    const resultDiv = document.getElementById('embedResult');
+                    resultDiv.innerHTML = `
+                        ✅ <strong>Success! Ownership Embedded.</strong><br><br>
+                        <span style="color:#d35400; font-size:0.9em;">👇 Niche image par <strong>Long Press</strong> karein aur 'Download Image' chunein (Mobile users):</span><br>
+                        <img src="${finalDataUrl}" style="max-width:100%; max-height:250px; border-radius:10px; margin-top:10px; border: 3px solid #28a745;">
+                        <br><br>
+                        <a href="${finalDataUrl}" download="Protected_Ownership.png" style="background:#28a745; color:white; padding:10px 20px; text-decoration:none; border-radius:8px; display:inline-block; margin-bottom:10px;">⬇️ Click Here to Download</a>
+                        <br>
+                        <small style="color:#721c24; display:block; padding:10px; background:#f8d7da; border-radius:5px; margin-top:10px;">⚠️ <strong>Important Note:</strong> Agar is image ko kisi ko WhatsApp par bhejenge toh ownership delete ho jayegi. Kisi ko bhejna ho toh hamesha <strong>"Document"</strong> banakar bhejein.</small>
+                    `;
+                    resultDiv.className = 'result success';
+                    resultDiv.classList.remove('hidden');
+                    
+                    // Attempt Auto-download as well
+                    downloadCanvas(canvas, `Protected_${Date.now()}.png`);
+
+                } catch (error) {
+                    alert("❌ Error: Image shayad bohot badi hai ya format support nahi kar raha. Kripya choti size ki image try karein.");
+                    console.error(error);
+                } finally {
+                    // Reset button state
+                    btn.innerText = "🔒 Embed & Download Image";
+                    btn.disabled = false;
                 }
-                
-                ctx.putImageData(imageData, 0, 0);
-                downloadCanvas(canvas, `protected_${Date.now()}.png`);
-                
-                document.getElementById('embedResult').innerHTML = '✅ <strong>Success!</strong> Ownership embedded. Download complete!';
-                document.getElementById('embedResult').className = 'result success';
-                document.getElementById('embedResult').classList.remove('hidden');
+            };
+            
+            img.onerror = () => {
+                alert("❌ Image load karne mein error aayi. Dusri image try karein.");
+                btn.innerText = "🔒 Embed & Download Image";
+                btn.disabled = false;
             };
             
             img.src = URL.createObjectURL(file);
         };
 
-        // Verify Data
+        // Verify Data (Original)
         document.getElementById('verifyBtn').onclick = function() {
             const file = document.getElementById('verifyImg').files[0];
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
             
+            // Loading state
+            const btn = document.getElementById('verifyBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Verifying...";
+            btn.disabled = true;
+
             img.onload = () => {
                 canvas.width = img.width;
                 canvas.height = img.height;
@@ -241,7 +282,6 @@
                 
                 if (ownerData) {
                     document.getElementById('verifyResult').innerHTML = `
-                        <div class="preview"><img src="${img.src}"></div>
                         <div class="status-badge badge-valid">✅ VALID OWNER FOUND</div>
                         <div class="owner-card">
                             <h3>👑 Ownership Verified!</h3>
@@ -265,16 +305,19 @@
                     `;
                 } else {
                     document.getElementById('verifyResult').innerHTML = `
-                        <div class="preview"><img src="${img.src}"></div>
                         <div class="status-badge badge-invalid">❌ NO OWNERSHIP FOUND</div>
                         <div class="result error">
                             <h3>Sorry! This image has no ownership.</h3>
-                            <p><strong>Upar wale section</strong> mein ownership banao ya dusri protected image try karo.</p>
+                            <p>Ya toh image original nahi hai, ya WhatsApp/Facebook dwara compress kar di gayi hai. (Original PNG image hi check karein).</p>
                         </div>
                     `;
                 }
                 
                 document.getElementById('verifyResult').classList.remove('hidden');
+                
+                // Reset button
+                btn.innerText = originalText;
+                btn.disabled = false;
             };
             
             img.src = URL.createObjectURL(file);
