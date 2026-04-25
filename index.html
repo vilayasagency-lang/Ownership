@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🛡️ Image Ownership Proofer - Perfect!</title>
+    
+    <!-- PWA REQUIRED TAGS (Added for Speed & App Install) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Proofer">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -172,14 +181,13 @@
             document.getElementById('verifyResult').classList.add('hidden');
         }
 
-        // Embed Data (UPDATED WITH FIXES)
+        // Embed Data
         document.getElementById('embedBtn').onclick = function() {
             const file = document.getElementById('uploadImg').files[0];
             const name = document.getElementById('name').value.trim();
             const mobile = document.getElementById('mobile').value.trim();
             const idnum = document.getElementById('idnum').value.trim();
             
-            // Button loading state
             const btn = document.getElementById('embedBtn');
             btn.innerText = "⏳ Processing... Please wait";
             btn.disabled = true;
@@ -210,7 +218,6 @@
                     
                     ctx.putImageData(imageData, 0, 0);
                     
-                    // Final image data url for screen display
                     const finalDataUrl = canvas.toDataURL('image/png');
                     
                     const resultDiv = document.getElementById('embedResult');
@@ -226,14 +233,12 @@
                     resultDiv.className = 'result success';
                     resultDiv.classList.remove('hidden');
                     
-                    // Attempt Auto-download as well
                     downloadCanvas(canvas, `Protected_${Date.now()}.png`);
 
                 } catch (error) {
                     alert("❌ Error: Image shayad bohot badi hai ya format support nahi kar raha. Kripya choti size ki image try karein.");
                     console.error(error);
                 } finally {
-                    // Reset button state
                     btn.innerText = "🔒 Embed & Download Image";
                     btn.disabled = false;
                 }
@@ -248,14 +253,13 @@
             img.src = URL.createObjectURL(file);
         };
 
-        // Verify Data (Original)
+        // Verify Data
         document.getElementById('verifyBtn').onclick = function() {
             const file = document.getElementById('verifyImg').files[0];
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
             
-            // Loading state
             const btn = document.getElementById('verifyBtn');
             const originalText = btn.innerText;
             btn.innerText = "⏳ Verifying...";
@@ -315,7 +319,6 @@
                 
                 document.getElementById('verifyResult').classList.remove('hidden');
                 
-                // Reset button
                 btn.innerText = originalText;
                 btn.disabled = false;
             };
@@ -323,8 +326,31 @@
             img.src = URL.createObjectURL(file);
         };
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', setupListeners);
+        // Initialize App & Setup Service Worker for PWA
+        document.addEventListener('DOMContentLoaded', () => {
+            setupListeners();
+            
+            // PWA SERVICE WORKER REGISTRATION (Added for App Install & Speed)
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js')
+                        .then(registration => {
+                            console.log('PWA ServiceWorker registered successfully with scope: ', registration.scope);
+                        })
+                        .catch(err => {
+                            console.log('ServiceWorker registration failed: ', err);
+                        });
+                });
+            }
+        });
     </script>
 </body>
 </html>
+
+
+    
+
+        
+        
+            
+            
