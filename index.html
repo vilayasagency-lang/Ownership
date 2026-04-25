@@ -5,13 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🛡️ Image Ownership Proofer - Perfect!</title>
     
-    <!-- PWA REQUIRED TAGS (Added for Speed & App Install) -->
+    <!-- PWA REQUIRED TAGS -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#28a745">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Proofer">
     <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- QR CODE LIBRARIES (For Invisible QR Generation & Scanning) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -106,19 +110,6 @@
             }
         }
 
-        function downloadCanvas(canvas, filename) {
-            canvas.toBlob((blob) => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 'image/png');
-        }
-
         // Event Listeners Setup
         function setupListeners() {
             const uploadImg = document.getElementById('uploadImg');
@@ -181,7 +172,7 @@
             document.getElementById('verifyResult').classList.add('hidden');
         }
 
-        // Embed Data
+        // Embed Data (Added Invisible QR + Removed Auto Download & Note)
         document.getElementById('embedBtn').onclick = function() {
             const file = document.getElementById('uploadImg').files[0];
             const name = document.getElementById('name').value.trim();
@@ -196,52 +187,75 @@
             const ctx = canvas.getContext('2d');
             const img = new Image();
             
-            const data = JSON.stringify({name, mobile, idnum, timestamp: Date.now()});
+            const dataObj = {name, mobile, idnum, timestamp: Date.now()};
+            const data = JSON.stringify(dataObj);
             const binData = strToBin(data);
             
             img.onload = () => {
                 try {
                     canvas.width = img.width;
                     canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
                     
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const pixels = imageData.data;
+                    // 1. Generate Invisible QR Code
+                    const qrSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.5); // size relative to image
+                    const qr = new QRious({
+                        value: data,
+                        size: qrSize,
+                        level: 'M'
+                    });
                     
-                    for (let i = 0; i < binData.length; i++) {
-                        const byteIndex = i % 3;
-                        const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
-                        if (pixelIndex < pixels.length) {
-                            pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | parseInt(binData[i]);
+                    const qrImg = new Image();
+                    qrImg.onload = () => {
+                        // Draw Original Image
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Draw Faint QR Code as Watermark (Invisible to bare eye)
+                        ctx.save();
+                        ctx.globalAlpha = 0.05; // 5% Opacity makes it look invisible
+                        ctx.globalCompositeOperation = 'darken';
+                        const qx = (canvas.width - qrSize) / 2;
+                        const qy = (canvas.height - qrSize) / 2;
+                        ctx.drawImage(qrImg, qx, qy, qrSize, qrSize);
+                        ctx.restore();
+
+                        // 2. Apply Deep Pixel LSB Embedding (Primary security)
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const pixels = imageData.data;
+                        for (let i = 0; i < binData.length; i++) {
+                            const byteIndex = i % 3;
+                            const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
+                            if (pixelIndex < pixels.length) {
+                                pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | parseInt(binData[i]);
+                            }
                         }
-                    }
-                    
-                    ctx.putImageData(imageData, 0, 0);
-                    
-                    const finalDataUrl = canvas.toDataURL('image/png');
-                    
-                    const resultDiv = document.getElementById('embedResult');
-                    resultDiv.innerHTML = `
-                        ✅ <strong>Success! Ownership Embedded.</strong><br><br>
-                        <span style="color:#d35400; font-size:0.9em;">👇 Niche image par <strong>Long Press</strong> karein aur 'Download Image' chunein (Mobile users):</span><br>
-                        <img src="${finalDataUrl}" style="max-width:100%; max-height:250px; border-radius:10px; margin-top:10px; border: 3px solid #28a745;">
-                        <br><br>
-                        <a href="${finalDataUrl}" download="Protected_Ownership.png" style="background:#28a745; color:white; padding:10px 20px; text-decoration:none; border-radius:8px; display:inline-block; margin-bottom:10px;">⬇️ Click Here to Download</a>
-                        <br>
-                        <small style="color:#721c24; display:block; padding:10px; background:#f8d7da; border-radius:5px; margin-top:10px;">⚠️ <strong>Important Note:</strong> Agar is image ko kisi ko WhatsApp par bhejenge toh ownership delete ho jayegi. Kisi ko bhejna ho toh hamesha <strong>"Document"</strong> banakar bhejein.</small>
-                    `;
-                    resultDiv.className = 'result success';
-                    resultDiv.classList.remove('hidden');
-                    
-                    downloadCanvas(canvas, `Protected_${Date.now()}.png`);
+                        ctx.putImageData(imageData, 0, 0);
+                        
+                        // Output final result to screen
+                        const finalDataUrl = canvas.toDataURL('image/png');
+                        
+                        const resultDiv = document.getElementById('embedResult');
+                        resultDiv.innerHTML = `
+                            ✅ <strong>Success! Ownership Embedded.</strong><br><br>
+                            <span style="color:#d35400; font-size:0.9em;">👇 Niche image par <strong>Long Press</strong> karein aur 'Download Image' chunein (Mobile users):</span><br>
+                            <img src="${finalDataUrl}" style="max-width:100%; max-height:250px; border-radius:10px; margin-top:10px; border: 3px solid #28a745;">
+                            <br><br>
+                            <a href="${finalDataUrl}" download="Protected_Ownership.png" style="background:#28a745; color:white; padding:10px 20px; text-decoration:none; border-radius:8px; display:inline-block; margin-bottom:10px;">⬇️ Click Here to Download</a>
+                        `;
+                        // Note: Auto-download and WhatsApp warning removed completely.
+                        resultDiv.className = 'result success';
+                        resultDiv.classList.remove('hidden');
+
+                        btn.innerText = "🔒 Embed & Download Image";
+                        btn.disabled = false;
+                    };
+                    qrImg.src = qr.toDataURL();
 
                 } catch (error) {
                     alert("❌ Error: Image shayad bohot badi hai ya format support nahi kar raha. Kripya choti size ki image try karein.");
                     console.error(error);
-                } finally {
                     btn.innerText = "🔒 Embed & Download Image";
                     btn.disabled = false;
-                }
+                } 
             };
             
             img.onerror = () => {
@@ -253,7 +267,7 @@
             img.src = URL.createObjectURL(file);
         };
 
-        // Verify Data
+        // Verify Data (Checks LSB first, then scans for Invisible QR fallback)
         document.getElementById('verifyBtn').onclick = function() {
             const file = document.getElementById('verifyImg').files[0];
             const canvas = document.createElement('canvas');
@@ -273,7 +287,9 @@
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const pixels = imageData.data;
                 let binData = '';
+                let ownerData = null;
                 
+                // STEP 1: Check LSB Method First
                 for (let i = 0; i < pixels.length / 12 * 3; i++) {
                     const byteIndex = i % 3;
                     const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
@@ -281,8 +297,22 @@
                         binData += (pixels[pixelIndex] & 1);
                     }
                 }
+                ownerData = binToStr(binData);
                 
-                const ownerData = binToStr(binData);
+                // STEP 2: If LSB fails (due to sharing), Check Invisible QR Code
+                if (!ownerData) {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+                    
+                    if (code) {
+                        try {
+                            ownerData = JSON.parse(code.data);
+                        } catch(e) {
+                            console.log("QR scanned but data invalid");
+                        }
+                    }
+                }
                 
                 if (ownerData) {
                     document.getElementById('verifyResult').innerHTML = `
@@ -312,7 +342,7 @@
                         <div class="status-badge badge-invalid">❌ NO OWNERSHIP FOUND</div>
                         <div class="result error">
                             <h3>Sorry! This image has no ownership.</h3>
-                            <p>Ya toh image original nahi hai, ya WhatsApp/Facebook dwara compress kar di gayi hai. (Original PNG image hi check karein).</p>
+                            <p>Ownership verify nahi ho payi. Original image use karein.</p>
                         </div>
                     `;
                 }
@@ -330,12 +360,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupListeners();
             
-            // PWA SERVICE WORKER REGISTRATION (Added for App Install & Speed)
+            // PWA SERVICE WORKER REGISTRATION 
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
                     navigator.serviceWorker.register('/sw.js')
                         .then(registration => {
-                            console.log('PWA ServiceWorker registered successfully with scope: ', registration.scope);
+                            console.log('PWA ServiceWorker registered successfully');
                         })
                         .catch(err => {
                             console.log('ServiceWorker registration failed: ', err);
@@ -346,11 +376,3 @@
     </script>
 </body>
 </html>
-
-
-    
-
-        
-        
-            
-            
