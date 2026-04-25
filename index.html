@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA Caching se bachne ke liye version change kiya -->
+    <title>🛡️ Image Ownership Proofer v2</title>
+    
+    <!-- PWA REQUIRED TAGS -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Proofer">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- QR CODE LIBRARIES -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 600px; margin: 0 auto; padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .app-container { background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 25px; text-align: center; }
+        .header h1 { font-size: 1.8em; margin-bottom: 5px; }
+        .section { padding: 25px; border-bottom: 1px solid #eee; }
+        .section:last-child { border-bottom: none; }
+        h2 { color: #333; margin-bottom: 20px; font-size: 1.3em; }
+        input { width: 100%; padding: 15px; margin: 10px 0; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; transition: border-color 0.3s; }
+        input:focus { outline: none; border-color: #28a745; box-shadow: 0 0 10px rgba(40,167,69,0.3); }
+        button { width: 100%; padding: 15px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        button:hover:not(:disabled) { transform: translateY(-2px); }
+        button:disabled { background: #6c757d; cursor: not-allowed; transform: none; }
+        .reset-btn { background: linear-gradient(135deg, #ffc107, #fd7e14) !important; width: auto !important; padding: 12px 25px !important; margin-top: 15px; }
+        .preview { text-align: center; margin: 20px 0; }
+        .preview img { max-width: 150px; max-height: 150px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); border: 4px solid #28a745; }
+        .result { margin: 20px 0; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; }
+        .success { background: linear-gradient(135deg, #d4edda, #c3e6cb); color: #155724; border: 2px solid #28a745; }
+        .error { background: linear-gradient(135deg, #f8d7da, #f5c6cb); color: #721c24; border: 2px solid #dc3545; }
+        .owner-card { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 25px; border-radius: 20px; margin: 20px 0; }
+        .owner-card h3 { margin-bottom: 20px; font-size: 1.5em; text-align: center; }
+        .detail { display: flex; justify-content: space-between; margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.2); border-radius: 12px; }
+        .detail-label { font-size: 1.1em; opacity: 0.9; }
+        .detail-value { background: rgba(255,255,255,0.3); padding: 8px 15px; border-radius: 8px; font-weight: bold; }
+        .status-badge { display: inline-block; padding: 10px 20px; border-radius: 25px; font-weight: bold; font-size: 0.9em; margin: 10px 0; }
+        .badge-valid { background: #28a745; color: white; }
+        .badge-invalid { background: #dc3545; color: white; }
+        .hidden { display: none !important; }
+        @media (max-width: 480px) { body { padding: 10px; } .header h1 { font-size: 1.4em; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🛡️ Image Ownership Proofer</h1>
+            <p>Upload → Protect → Verify</p>
+        </div>
+
+        <!-- EMBED SECTION -->
+        <div class="section" id="embedSection">
+            <h2>📤 1. Ownership Add Karo</h2>
+            <input type="file" id="uploadImg" accept="image/*">
+            <input type="text" id="name" placeholder="👤 Aapka Pura Naam">
+            <input type="tel" id="mobile" placeholder="📱 Mobile Number (10 digits)">
+            <input type="text" id="idnum" placeholder="🆔 Aadhaar / Passport Number">
+            <button id="embedBtn" disabled>🔒 Embed & Create Image</button>
+            <div id="embedPreview" class="preview hidden"></div>
+            <div id="embedResult" class="result hidden"></div>
+            <button class="reset-btn" onclick="resetEmbed()" type="button">⟳ Reset Form</button>
+        </div>
+
+        <!-- VERIFY SECTION -->
+        <div class="section" id="verifySection">
+            <h2>🔍 2. Ownership Verify Karo</h2>
+            <input type="file" id="verifyImg" accept="image/*">
+            <button id="verifyBtn" disabled>✅ Check Owner Details</button>
+            
+            <div id="verifyPreview" class="preview hidden"></div>
+            <div id="verifyResult" class="hidden"></div>
+            
+            <button class="reset-btn" onclick="resetVerify()" type="button">⟳ Clear & New Image</button>
+        </div>
+    </div>
+
+    <script>
+        // Data to Binary conversion for LSB
+        function strToBin(str) {
+            let bin = str.length.toString(2).padStart(32, '0');
+            for (let i = 0; i < str.length; i++) {
+                bin += str.charCodeAt(i).toString(2).padStart(8, '0');
+            }
+            return bin;
+        }
+
+        function binToStr(binStr) {
+            try {
+                const len = parseInt(binStr.substring(0, 32), 2);
+                let str = '';
+                for (let i = 0; i < len; i++) {
+                    str += String.fromCharCode(parseInt(binStr.substring(32 + i * 8, 40 + i * 8), 2));
+                }
+                return JSON.parse(str);
+            } catch(e) {
+                return null;
+            }
+        }
+
+        // Setup Listeners
+        function setupListeners() {
+            const uploadImg = document.getElementById('uploadImg');
+            const verifyImg = document.getElementById('verifyImg');
+            const inputs = ['name', 'mobile', 'idnum'];
+
+            uploadImg.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        document.getElementById('embedPreview').innerHTML = `<img src="${ev.target.result}">`;
+                        document.getElementById('embedPreview').classList.remove('hidden');
+                        document.getElementById('embedResult').classList.add('hidden'); // Hide result when new image selected
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+                updateEmbedBtn();
+            });
+
+            verifyImg.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        document.getElementById('verifyPreview').innerHTML = `<img src="${ev.target.result}">`;
+                        document.getElementById('verifyPreview').classList.remove('hidden');
+                        document.getElementById('verifyResult').classList.add('hidden');
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+                document.getElementById('verifyBtn').disabled = false;
+            });
+
+            inputs.forEach(id => {
+                document.getElementById(id).addEventListener('input', updateEmbedBtn);
+            });
+        }
+
+        function updateEmbedBtn() {
+            const file = document.getElementById('uploadImg').files[0];
+            const name = document.getElementById('name').value.trim();
+            const mobile = document.getElementById('mobile').value.trim();
+            const idnum = document.getElementById('idnum').value.trim();
+            document.getElementById('embedBtn').disabled = !(file && name && mobile && idnum);
+        }
+
+        // Reset Functions
+        function resetEmbed() {
+            document.getElementById('uploadImg').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('mobile').value = '';
+            document.getElementById('idnum').value = '';
+            document.getElementById('embedBtn').disabled = true;
+            document.getElementById('embedPreview').classList.add('hidden');
+            document.getElementById('embedResult').classList.add('hidden');
+        }
+
+        function resetVerify() {
+            document.getElementById('verifyImg').value = '';
+            document.getElementById('verifyBtn').disabled = true;
+            document.getElementById('verifyPreview').classList.add('hidden');
+            document.getElementById('verifyResult').classList.add('hidden');
+        }
+
+        // --- EMBED LOGIC (Fixing App Freeze & Adding Strong QR Watermark) ---
+        document.getElementById('embedBtn').onclick = function() {
+            const btn = document.getElementById('embedBtn');
+            btn.innerText = "⏳ Processing... Please wait";
+            btn.disabled = true;
+
+            // setTimeout gives UI time to update the button text before heavy processing
+            setTimeout(() => {
+                const file = document.getElementById('uploadImg').files[0];
+                const name = document.getElementById('name').value.trim();
+                const mobile = document.getElementById('mobile').value.trim();
+                const idnum = document.getElementById('idnum').value.trim();
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                const dataObj = {name, mobile, idnum, timestamp: Date.now()};
+                const data = JSON.stringify(dataObj);
+                const binData = strToBin(data);
+                
+                img.onload = () => {
+                    try {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        // Draw Original Image
+                        ctx.drawImage(img, 0, 0);
+
+                        // --- 1. QR CODE WATERMARK (For Screenshot Survival) ---
+                        // Size is relative to image, but not too small. Level 'H' for high error recovery.
+                        const qrSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.4); 
+                        const qr = new QRious({
+                            value: data,
+                            size: qrSize,
+                            level: 'H' 
+                        });
+                        
+                        const qrImg = new Image();
+                        qrImg.onload = () => {
+                            ctx.save();
+                            // Opacity set to 25%. It acts as a faint watermark. 
+                            // If it's completely invisible, screenshots will destroy it.
+                            ctx.globalAlpha = 0.25; 
+                            const qx = (canvas.width - qrSize) / 2;
+                            const qy = (canvas.height - qrSize) / 2;
+                            ctx.drawImage(qrImg, qx, qy, qrSize, qrSize);
+                            ctx.restore();
+
+                            // --- 2. INVISIBLE LSB EMBEDDING (For direct file sharing) ---
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const pixels = imageData.data;
+                            for (let i = 0; i < binData.length; i++) {
+                                const byteIndex = i % 3;
+                                const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
+                                if (pixelIndex < pixels.length) {
+                                    pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | parseInt(binData[i]);
+                                }
+                            }
+                            ctx.putImageData(imageData, 0, 0);
+                            
+                            // Create Final Result UI
+                            const finalDataUrl = canvas.toDataURL('image/png');
+                            const resultDiv = document.getElementById('embedResult');
+                            
+                            document.getElementById('embedPreview').classList.add('hidden'); // Hide original preview
+                            
+                            resultDiv.innerHTML = `
+                                ✅ <strong>Success! Ownership Embedded.</strong><br><br>
+                                <img src="${finalDataUrl}" style="max-width:100%; max-height:250px; border-radius:10px; margin-top:10px; border: 3px solid #28a745;">
+                                <br><br>
+                                <a href="${finalDataUrl}" download="Protected_Ownership.png" style="background:#28a745; color:white; padding:12px 25px; text-decoration:none; border-radius:8px; display:inline-block; font-weight:bold;">⬇️ Click Here to Download</a>
+                            `;
+                            resultDiv.className = 'result success';
+                            resultDiv.classList.remove('hidden');
+
+                            btn.innerText = "🔒 Embed & Create Image";
+                            btn.disabled = false;
+                        };
+                        qrImg.src = qr.toDataURL();
+
+                    } catch (error) {
+                        alert("❌ Error: Image process nahi ho payi.");
+                        console.error(error);
+                        btn.innerText = "🔒 Embed & Create Image";
+                        btn.disabled = false;
+                    } 
+                };
+                
+                img.src = URL.createObjectURL(file);
+            }, 100);
+        };
+
+        // --- VERIFY LOGIC ---
+        document.getElementById('verifyBtn').onclick = function() {
+            const btn = document.getElementById('verifyBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Verifying...";
+            btn.disabled = true;
+
+            setTimeout(() => {
+                const file = document.getElementById('verifyImg').files[0];
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const pixels = imageData.data;
+                    let binData = '';
+                    let ownerData = null;
+                    
+                    // METHOD 1: Check Invisible LSB (Fastest, works on original downloads)
+                    for (let i = 0; i < pixels.length / 12 * 3; i++) {
+                        const byteIndex = i % 3;
+                        const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
+                        if (pixelIndex < pixels.length) {
+                            binData += (pixels[pixelIndex] & 1);
+                        }
+                    }
+                    ownerData = binToStr(binData);
+                    
+                    // METHOD 2: Check QR Watermark (Fallback for Screenshots/WhatsApp)
+                    if (!ownerData) {
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "attemptBoth",
+                        });
+                        
+                        if (code) {
+                            try {
+                                ownerData = JSON.parse(code.data);
+                            } catch(e) {
+                                console.log("QR decoded but data invalid");
+                            }
+                        }
+                    }
+                    
+                    if (ownerData) {
+                        document.getElementById('verifyResult').innerHTML = `
+                            <div class="status-badge badge-valid">✅ VALID OWNER FOUND</div>
+                            <div class="owner-card">
+                                <h3>👑 Ownership Verified!</h3>
+                                <div class="detail">
+                                    <span class="detail-label">👤 Name</span>
+                                    <span class="detail-value">${ownerData.name}</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="detail-label">📱 Mobile</span>
+                                    <span class="detail-value">${ownerData.mobile}</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="detail-label">🆔 ID</span>
+                                    <span class="detail-value">${ownerData.idnum}</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="detail-label">⏰ Created</span>
+                                    <span class="detail-value">${new Date(ownerData.timestamp).toLocaleString('hi-IN')}</span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('verifyResult').innerHTML = `
+                            <div class="status-badge badge-invalid">❌ NO OWNERSHIP FOUND</div>
+                            <div class="result error">
+                                <h3>Data Match Nahi Hua!</h3>
+                                <p>Yeh image original nahi hai ya iska data destroy ho chuka hai.</p>
+                            </div>
+                        `;
+                    }
+                    
+                    document.getElementById('verifyResult').classList.remove('hidden');
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                };
+                
+                img.src = URL.createObjectURL(file);
+            }, 100);
+        };
+
+        // Initialize App & PWA
+        document.addEventListener('DOMContentLoaded', () => {
+            setupListeners();
+            
+            // Bypass old cache by unregistering old Service Workers first (Crucial Fix)
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.update();
+                    }
+                });
+                
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW fail: ', err));
+                });
+            }
+        });
+    </script>
+</body>
+</html>
