@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛡️ Secure Image Ownership Proofer</title>
+    
+    <!-- PWA REQUIRED TAGS -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#28a745">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Proofer">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- QR CODE LIBRARIES -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 600px; margin: 0 auto; padding: 20px; 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+        }
+        .app-container { background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 25px; text-align: center; }
+        .header h1 { font-size: 1.8em; margin-bottom: 5px; }
+        .section { padding: 25px; border-bottom: 1px solid #eee; }
+        .section:last-child { border-bottom: none; }
+        h2 { color: #333; margin-bottom: 20px; font-size: 1.3em; }
+        input { width: 100%; padding: 15px; margin: 10px 0; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; transition: border-color 0.3s; }
+        input:focus { outline: none; border-color: #28a745; box-shadow: 0 0 10px rgba(40,167,69,0.3); }
+        input:disabled { background: #f8f9fa; cursor: not-allowed; opacity: 0.7; }
+        button { width: 100%; padding: 15px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        button:hover:not(:disabled) { transform: translateY(-2px); }
+        button:disabled { background: #6c757d; cursor: not-allowed; transform: none; }
+        .reset-btn { background: linear-gradient(135deg, #ffc107, #fd7e14) !important; width: auto !important; padding: 12px 25px !important; margin-top: 15px; }
+        .preview { text-align: center; margin: 20px 0; }
+        .preview img { max-width: 150px; max-height: 150px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); border: 4px solid #28a745; }
+        .result { margin: 20px 0; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; }
+        .success { background: linear-gradient(135deg, #d4edda, #c3e6cb); color: #155724; border: 2px solid #28a745; }
+        .error { background: linear-gradient(135deg, #f8d7da, #f5c6cb); color: #721c24; border: 2px solid #dc3545; }
+        .owner-card { background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 25px; border-radius: 20px; margin: 20px 0; }
+        .owner-card h3 { margin-bottom: 20px; font-size: 1.5em; text-align: center; }
+        .detail { display: flex; justify-content: space-between; margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.2); border-radius: 12px; }
+        .detail-label { font-size: 1.1em; opacity: 0.9; }
+        .detail-value { background: rgba(255,255,255,0.3); padding: 8px 15px; border-radius: 8px; font-weight: bold; }
+        .status-badge { display: inline-block; padding: 10px 20px; border-radius: 25px; font-weight: bold; font-size: 0.9em; margin: 10px 0; }
+        .badge-valid { background: #28a745; color: white; }
+        .badge-invalid { background: #dc3545; color: white; }
+        .hidden { display: none !important; }
+        .locked-warning { background: #ffeeba; color: #856404; padding: 15px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; border: 2px solid #ffc107; text-align: center; }
+        .confidential-msg { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; font-size: 0.9em; border: 1px solid #ffeeba; margin-top: 15px; text-align: left; }
+        @media (max-width: 480px) { body { padding: 10px; } .header h1 { font-size: 1.4em; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🛡️ Anti-Theft Image Proofer</h1>
+            <p>100% Secure Ownership Protection</p>
+        </div>
+
+        <!-- EMBED SECTION -->
+        <div class="section" id="embedSection">
+            <h2>📤 1. Ownership Add Karo</h2>
+            
+            <!-- ANTI-THEFT & UNLOCK UI -->
+            <div id="lockedMessage" class="locked-warning hidden">
+                <div id="lockedText">⚠️ Ye image pehle se kisi aur ke naam par protected hai!</div>
+                
+                <div id="unlockSection" style="margin-top:15px; padding-top:15px; border-top:1px solid rgba(133,100,4,0.3); text-align:left;">
+                    <p style="font-size:0.9em; margin-bottom:10px;">Agar aap iske asli owner hain, toh <strong>Edit / Update</strong> karne ke liye apna purana Mobile aur ID daalein:</p>
+                    <input type="tel" id="unlockMobile" placeholder="📱 Purana Mobile Number" style="background:white; margin-bottom:10px;">
+                    <input type="text" id="unlockId" placeholder="🆔 Purana ID Number" style="background:white; margin-bottom:10px;">
+                    <button type="button" id="unlockBtn" style="background:#17a2b8; color:white; font-size:15px;">🔑 Verify & Unlock Edit</button>
+                </div>
+            </div>
+            
+            <input type="file" id="uploadImg" accept="image/*">
+            <input type="text" id="name" placeholder="👤 Aapka Pura Naam">
+            <input type="tel" id="mobile" placeholder="📱 Mobile Number (10 digits)">
+            <input type="text" id="idnum" placeholder="🆔 Aadhaar / Passport Number">
+            <button id="embedBtn" disabled>🔒 Secure & Download Image</button>
+            <div id="embedPreview" class="preview hidden"></div>
+            <div id="embedResult" class="result hidden"></div>
+            <button class="reset-btn" onclick="resetEmbed()" type="button">⟳ Reset Form</button>
+        </div>
+
+        <!-- VERIFY SECTION -->
+        <div class="section" id="verifySection">
+            <h2>🔍 2. Ownership Verify Karo</h2>
+            <input type="file" id="verifyImg" accept="image/*">
+            <button id="verifyBtn" disabled>✅ Check Owner Details</button>
+            
+            <div id="verifyPreview" class="preview hidden"></div>
+            <div id="verifyResult" class="hidden"></div>
+            
+            <button class="reset-btn" onclick="resetVerify()" type="button">⟳ Clear & New Image</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variable to store detected data for unlocking
+        let currentEmbeddedData = null;
+
+        // Data Converters
+        function strToBin(str) {
+            let bin = str.length.toString(2).padStart(32, '0');
+            for (let i = 0; i < str.length; i++) {
+                bin += str.charCodeAt(i).toString(2).padStart(8, '0');
+            }
+            return bin;
+        }
+
+        function binToStr(binStr) {
+            try {
+                const len = parseInt(binStr.substring(0, 32), 2);
+                let str = '';
+                for (let i = 0; i < len; i++) {
+                    str += String.fromCharCode(parseInt(binStr.substring(32 + i * 8, 40 + i * 8), 2));
+                }
+                return JSON.parse(str);
+            } catch(e) {
+                return null;
+            }
+        }
+
+        // --- CORE LOGIC: EXTRACT OWNERSHIP ---
+        function extractOwnership(imgElement, callback) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = imgElement.width;
+            canvas.height = imgElement.height;
+            ctx.drawImage(imgElement, 0, 0);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            let binData = '';
+            let ownerData = null;
+            
+            for (let i = 0; i < pixels.length / 12 * 3; i++) {
+                const byteIndex = i % 3;
+                const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
+                if (pixelIndex < pixels.length) {
+                    binData += (pixels[pixelIndex] & 1);
+                }
+            }
+            ownerData = binToStr(binData);
+            
+            if (!ownerData) {
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+                if (code) {
+                    try { ownerData = JSON.parse(code.data); } catch(e) {}
+                }
+            }
+            callback(ownerData);
+        }
+
+        // Listeners & UI Logic
+        function setupListeners() {
+            const uploadImg = document.getElementById('uploadImg');
+            const verifyImg = document.getElementById('verifyImg');
+            const inputs = ['name', 'mobile', 'idnum'];
+
+            // ANTI-THEFT PRE-CHECK LOGIC
+            uploadImg.addEventListener('change', (e) => {
+                resetFormInputs(false);
+                document.getElementById('lockedMessage').classList.add('hidden');
+                currentEmbeddedData = null;
+                
+                if (e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            document.getElementById('embedPreview').innerHTML = `<img src="${img.src}">`;
+                            document.getElementById('embedPreview').classList.remove('hidden');
+                            
+                            // Check if already claimed
+                            extractOwnership(img, (owner) => {
+                                if (owner) {
+                                    currentEmbeddedData = owner; // Store for unlock verification
+                                    document.getElementById('lockedText').innerHTML = `⚠️ Dhyan Dein! Ye image pehle se <strong>${owner.name}</strong> ke naam par protected hai. Naya claim block kar diya gaya hai.`;
+                                    document.getElementById('lockedMessage').classList.remove('hidden');
+                                    disableFormInputs(true);
+                                } else {
+                                    updateEmbedBtn();
+                                }
+                            });
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+            });
+
+            // UNLOCK BUTTON LOGIC (EDIT/UPDATE)
+            document.getElementById('unlockBtn').addEventListener('click', () => {
+                const uMobile = document.getElementById('unlockMobile').value.trim();
+                const uId = document.getElementById('unlockId').value.trim();
+
+                if(currentEmbeddedData && uMobile === currentEmbeddedData.mobile && uId === currentEmbeddedData.idnum) {
+                    alert("✅ Verification Successful! Ab aap details edit aur update kar sakte hain.");
+                    document.getElementById('lockedMessage').classList.add('hidden');
+                    
+                    // Pre-fill purana data
+                    document.getElementById('name').value = currentEmbeddedData.name;
+                    document.getElementById('mobile').value = currentEmbeddedData.mobile;
+                    document.getElementById('idnum').value = currentEmbeddedData.idnum;
+                    
+                    disableFormInputs(false);
+                    updateEmbedBtn();
+                } else {
+                    alert("❌ Verification Failed! Mobile Number ya ID Number galat hai. Aap asli owner nahi hain.");
+                }
+            });
+
+            verifyImg.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        document.getElementById('verifyPreview').innerHTML = `<img src="${ev.target.result}">`;
+                        document.getElementById('verifyPreview').classList.remove('hidden');
+                        document.getElementById('verifyResult').classList.add('hidden');
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+                document.getElementById('verifyBtn').disabled = false;
+            });
+
+            inputs.forEach(id => {
+                document.getElementById(id).addEventListener('input', updateEmbedBtn);
+            });
+        }
+
+        function updateEmbedBtn() {
+            const file = document.getElementById('uploadImg').files[0];
+            const name = document.getElementById('name').value.trim();
+            const mobile = document.getElementById('mobile').value.trim();
+            const idnum = document.getElementById('idnum').value.trim();
+            document.getElementById('embedBtn').disabled = !(file && name && mobile && idnum);
+        }
+
+        function disableFormInputs(disable) {
+            document.getElementById('name').disabled = disable;
+            document.getElementById('mobile').disabled = disable;
+            document.getElementById('idnum').disabled = disable;
+            document.getElementById('embedBtn').disabled = disable;
+        }
+
+        function resetFormInputs(clearFile = true) {
+            if(clearFile) document.getElementById('uploadImg').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('mobile').value = '';
+            document.getElementById('idnum').value = '';
+            document.getElementById('unlockMobile').value = '';
+            document.getElementById('unlockId').value = '';
+            disableFormInputs(false);
+            document.getElementById('embedBtn').disabled = true;
+        }
+
+        function resetEmbed() {
+            resetFormInputs(true);
+            currentEmbeddedData = null;
+            document.getElementById('lockedMessage').classList.add('hidden');
+            document.getElementById('embedPreview').classList.add('hidden');
+            document.getElementById('embedResult').classList.add('hidden');
+        }
+
+        function resetVerify() {
+            document.getElementById('verifyImg').value = '';
+            document.getElementById('verifyBtn').disabled = true;
+            document.getElementById('verifyPreview').classList.add('hidden');
+            document.getElementById('verifyResult').classList.add('hidden');
+        }
+
+        // --- EMBED PROCESS ---
+        document.getElementById('embedBtn').onclick = function() {
+            const btn = document.getElementById('embedBtn');
+            btn.innerText = "⏳ Processing Image...";
+            btn.disabled = true;
+
+            setTimeout(() => {
+                const file = document.getElementById('uploadImg').files[0];
+                const name = document.getElementById('name').value.trim();
+                const mobile = document.getElementById('mobile').value.trim();
+                const idnum = document.getElementById('idnum').value.trim();
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                const dataObj = {name, mobile, idnum, timestamp: Date.now()};
+                const data = JSON.stringify(dataObj);
+                const binData = strToBin(data);
+                
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    ctx.drawImage(img, 0, 0);
+
+                    const qrSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.45); 
+                    const qr = new QRious({ value: data, size: qrSize, level: 'H' });
+                    
+                    const qrImg = new Image();
+                    qrImg.onload = () => {
+                        ctx.save();
+                        ctx.globalAlpha = 0.12; 
+                        ctx.globalCompositeOperation = 'darken';
+                        const qx = (canvas.width - qrSize) / 2;
+                        const qy = (canvas.height - qrSize) / 2;
+                        ctx.drawImage(qrImg, qx, qy, qrSize, qrSize);
+                        ctx.restore();
+
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const pixels = imageData.data;
+                        for (let i = 0; i < binData.length; i++) {
+                            const byteIndex = i % 3;
+                            const pixelIndex = Math.floor(i / 3) * 12 + byteIndex * 4;
+                            if (pixelIndex < pixels.length) {
+                                pixels[pixelIndex] = (pixels[pixelIndex] & 0xFE) | parseInt(binData[i]);
+                            }
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        
+                        const finalDataUrl = canvas.toDataURL('image/png');
+                        const resultDiv = document.getElementById('embedResult');
+                        document.getElementById('embedPreview').classList.add('hidden'); 
+                        
+                        // ADDED CONFIDENTIALITY MESSAGE HERE
+                        resultDiv.innerHTML = `
+                            ✅ <strong>Success! Ownership Secured.</strong><br>
+                            
+                            <div class="confidential-msg">
+                                🔒 <strong>CONFIDENTIAL:</strong> Aapka Mobile Number aur ID Number ek Password ki tarah hai. Agar bhavishya mein aapko is image ka naam ya details <strong>Edit/Update</strong> karni ho, toh inhi dono details ki zaroorat padegi. Inhe kisi ke sath share na karein!
+                            </div><br>
+
+                            <img src="${finalDataUrl}" style="max-width:100%; max-height:250px; border-radius:10px; border: 3px solid #28a745;">
+                            <br><br>
+                            <a href="${finalDataUrl}" download="${name.replace(/ /g,'_')}_Secured.png" style="background:#28a745; color:white; padding:12px 25px; text-decoration:none; border-radius:8px; display:inline-block; font-weight:bold;">⬇️ Click Here to Download</a>
+                        `;
+                        resultDiv.className = 'result success';
+                        resultDiv.classList.remove('hidden');
+
+                        btn.innerText = "🔒 Secure & Download Image";
+                        btn.disabled = false;
+                        resetFormInputs(false); 
+                    };
+                    qrImg.src = qr.toDataURL();
+                };
+                img.src = URL.createObjectURL(file);
+            }, 100);
+        };
+
+        // --- VERIFY PROCESS ---
+        document.getElementById('verifyBtn').onclick = function() {
+            const btn = document.getElementById('verifyBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Verifying Ownership...";
+            btn.disabled = true;
+
+            setTimeout(() => {
+                const file = document.getElementById('verifyImg').files[0];
+                const img = new Image();
+
+                img.onload = () => {
+                    extractOwnership(img, (ownerData) => {
+                        if (ownerData) {
+                            document.getElementById('verifyResult').innerHTML = `
+                                <div class="status-badge badge-valid">✅ VALID OWNER FOUND</div>
+                                <div class="owner-card">
+                                    <h3>👑 Ownership Verified!</h3>
+                                    <div class="detail"><span class="detail-label">👤 Name</span><span class="detail-value">${ownerData.name}</span></div>
+                                    <div class="detail"><span class="detail-label">📱 Mobile</span><span class="detail-value">${ownerData.mobile}</span></div>
+                                    <div class="detail"><span class="detail-label">🆔 ID</span><span class="detail-value">${ownerData.idnum}</span></div>
+                                    <div class="detail"><span class="detail-label">⏰ Secured On</span><span class="detail-value">${new Date(ownerData.timestamp).toLocaleString('hi-IN')}</span></div>
+                                </div>
+                            `;
+                        } else {
+                            document.getElementById('verifyResult').innerHTML = `
+                                <div class="status-badge badge-invalid">❌ NO OWNERSHIP FOUND</div>
+                                <div class="result error">
+                                    <h3>Data Match Nahi Hua!</h3>
+                                    <p>Yeh image original nahi hai ya kisi ne data mitane ki koshish ki hai.</p>
+                                </div>
+                            `;
+                        }
+                        document.getElementById('verifyResult').classList.remove('hidden');
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    });
+                };
+                img.src = URL.createObjectURL(file);
+            }, 100);
+        };
+
+        // Initialize & PWA Bypass Cache logic
+        document.addEventListener('DOMContentLoaded', () => {
+            setupListeners();
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) { registration.update(); }
+                });
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW fail: ', err));
+                });
+            }
+        });
+    </script>
+</body>
+</html>
